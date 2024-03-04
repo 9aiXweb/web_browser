@@ -1,6 +1,17 @@
 import socket
 import ssl
 import tkinter
+import tkinter.font
+
+FONTS = {}
+def get_font(size, weight, slant):
+    key = (size, weight, slant)
+    if key not in FONTS:
+        font = tkinter.font.Font(size=size, weight=weight,
+            slant=slant)
+        label = tkinter.Label(font=font)
+        FONTS[key] = (font, label)
+    return FONTS[key][0]
 
 class URL:
     def __init__(self, url):
@@ -50,6 +61,20 @@ class URL:
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 100
+
+class Text: 
+    def __init__(self, text):
+            self.text = text
+
+    def __repr__(self):
+        return "Text('{}')".format(self.text)
+class Tag:
+    def __init__(self, tag):
+        self.tag = tag
+
+    def __repr__(self):
+        return "Tag('{}')".format(self.tag)
+    
 class Browser:
     def __init__(self):
         self.window = tkinter.Tk()
@@ -61,6 +86,13 @@ class Browser:
         self.canvas.pack()
         self.scroll = 0
         self.window.bind("<Down>", self.scrolldown)
+        # font
+        bi_times = tkinter.font.Font(
+            family="Times",
+            size=16,
+            weight="bold",
+            slant="italic",
+        )
     def load(self, url):
         body = url.request()
         text = lex(body)
@@ -80,30 +112,83 @@ class Browser:
         self.draw()
 
 def lex(body):
-    text = ""
+    out = []
+    buffer = ""
     in_tag = False
     for c in body:
         if c == "<":
             in_tag = True
+            if buffer: out.append(Text(buffer))
+            buffer = ""
         elif c == ">":
             in_tag = False
-        elif not in_tag:
-            text += c
-    return text
+            out.append(Tag(buffer))
+            buffer = ""
+        else:
+            buffer += c
+    if not in_tag and buffer:
+        out.append(Text(buffer))
+    return out
 
-def layout(text):
+def layout(tokens):
     display_list = []
     cursor_x, cursor_y = HSTEP, VSTEP
-    for c in text:
-        display_list.append((cursor_x, cursor_y, c))
-        cursor_x += HSTEP
-        if cursor_x >= WIDTH - HSTEP:
-            cursor_y += VSTEP
-            cursor_x = HSTEP
-        
+    for tok in tokens:
+        if isinstance(tok, Text):
+            for word in tok.text.split():
+                display_list.append((cursor_x, cursor_y, word))
+                cursor_x += HSTEP * len(word)
+                if cursor_x >= WIDTH - HSTEP:
+                    cursor_y += VSTEP
+                    cursor_x = HSTEP
     return display_list
 
 if __name__ == "__main__":
     import sys
     Browser().load(URL(sys.argv[1]))
     tkinter.mainloop()
+
+
+class Layout:
+    def __init__(self, tokens):
+        self.display_list = []
+        for tok in tokens:
+            self.token(tok)
+        self.line = []
+        self.flush()
+    def token(self, tok):
+        if isinstance(tok, Text):
+            self.text(tok)
+        elif isinstance(tok, Tag):
+            self.tag(tok)
+        elif tok.tag == "small":
+            self.size -= 2
+        elif tok.tag == "/small":
+            self.size += 2
+        elif tok.tag == "big":
+            self.size += 4
+        elif tok.tag == "/big":
+            self.size -= 4
+        elif tok.tag == "br":
+            self.flush()
+        elif tok.tag == "/p":
+            self.flush()
+        self.cursor_y += VSTEP
+
+    def word(self, word):
+        font = get_font(self.size, self.weight, self.style)
+        if self.cursor_x + w > WIDTH - HSTEP:
+            self.flush()
+        font = tkinter.font.Font(
+        size=16,
+        weight=self.weight,
+        slant=self.style,
+        )
+        w = font.measure(word)
+        self.line.append((self.cursor_x, word, font))
+    def flush(self):
+        if not self.line: return
+        max_ascent = max([font.metrics("ascent")
+        for x, word, font in self.line])
+
+        

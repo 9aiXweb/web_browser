@@ -1,9 +1,11 @@
 # web_browser
 
--https://browser.engineering/
+- https://browser.engineering/
 
 ## run flask server
--python app.py
+- python app.py
 
 ## access the flask server by using url and port number.
--python3 browser.py http://localhost:8888/
+- python3 browser.py http://localhost:8888/
+
+- python3 browser.py http://example.org/
